@@ -1,0 +1,5 @@
+# Personal data: never commit
+my-data/*
+!my-data/README.md
+not-youtube/
+*.zip

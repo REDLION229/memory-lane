@@ -22,13 +22,13 @@ Everything runs on your own computer. Your data is never uploaded anywhere.
 
 ## 2. Open the app
 
-**Easiest (auto-loads every time):** needs [Node.js](https://nodejs.org) installed.
+1. Download this project (green **Code** button, then **Download ZIP**) and unzip it.
+2. Double-click `index.html`. It opens in your browser.
+3. Click **Import your YouTube data** and select every Takeout `.zip` at once. You don't need to unzip them.
 
-1. Unzip your Takeout download.
-2. Copy the CSV/HTML/JSON files into the `my-data` folder (subfolders are fine).
-3. Double-click `start.bat` (Windows), or run `node server.js`. The app opens in your browser.
+Your data is saved in your browser, so it's there the next time you open the app. Use **Add files** to add more later, or **Start over** to erase it.
 
-**No install:** double-click `index.html`, then drop your Takeout `.zip` or unzipped folder onto the page. The app remembers it for next time.
+**Optional, auto-load from a folder:** if you have [Node.js](https://nodejs.org), put your unzipped Takeout files in the `my-data` folder and run `start.bat` (Windows) or `node server.js`. The app loads everything in that folder each time it opens.
 
 ## What it can show
 

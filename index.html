@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en" data-theme="midnight">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Memory Lane</title>
+<script>
+  // Apply saved theme before first paint
+  try {
+    const t = JSON.parse(localStorage.getItem('ml-theme') || 'null'), a = JSON.parse(localStorage.getItem('ml-accent') || 'null');
+    if (t) document.documentElement.dataset.theme = t;
+    if (a) document.documentElement.dataset.accent = a;
+  } catch (e) {}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="parser.js"></script>
+<style>
+  /* ---------- themes ---------- */
+  :root, [data-theme="midnight"] {
+    --bg: #08090a; --surface: #0f1011; --surface-2: #161718; --line: #23252a; --line-strong: #383b3f;
+    --ink: #f7f8f8; --ink-2: #d0d6e0; --muted: #8a8f98; --faint: #62666d;
+    --blur: none; --card-shadow: none; --grid: rgba(255,255,255,.06);
+  }
+  [data-theme="glass"] {
+    --bg: #060a13; --surface: rgba(20,26,38,.52); --surface-2: rgba(255,255,255,.06); --line: rgba(255,255,255,.09); --line-strong: rgba(255,255,255,.2);
+    --ink: #f2f5fa; --ink-2: #d3dbe8; --muted: #94a1b6; --faint: #66728a;
+    --blur: blur(18px) saturate(140%); --card-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 20px 50px -20px rgba(0,0,0,.6); --grid: rgba(255,255,255,.07);
+  }
+  [data-theme="daylight"] {
+    --bg: #f4f4f2; --surface: #ffffff; --surface-2: #f0f0ed; --line: #e5e5e1; --line-strong: #d2d2cd;
+    --ink: #111214; --ink-2: #2f3237; --muted: #6b6f76; --faint: #9a9ea5;
+    --blur: none; --card-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -12px rgba(0,0,0,.08); --grid: rgba(0,0,0,.06);
+  }
+  /* ---------- accents ---------- */
+  :root, [data-accent="red"] { --accent: #ff4e45; --accent-ink: #ffffff; }
+  [data-accent="lime"]   { --accent: #e4f222; --accent-ink: #0b0c00; }
+  [data-accent="violet"] { --accent: #9b8cff; --accent-ink: #0d0a1f; }
+  [data-accent="blue"]   { --accent: #5b9dff; --accent-ink: #04111f; }
+  [data-accent="mint"]   { --accent: #4ade9b; --accent-ink: #03140b; }
+  [data-accent="pink"]   { --accent: #ff7eb6; --accent-ink: #1f0612; }
+  :root { --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent); --accent-fg: var(--accent); }
+  [data-theme="daylight"] { --accent-fg: color-mix(in srgb, var(--accent) 62%, #000); }
+
+  :root {
+    --sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", Consolas, ui-monospace, monospace;
+    --r-lg: 18px; --r-md: 12px; --r-sm: 8px;
+  }
+
+  /* ---------- base ---------- */
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.55 var(--sans); letter-spacing: -.011em; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  a { color: inherit; }
+  [hidden] { display: none !important; }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  /* Glass background */
+  #sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; display: none; }
+  [data-theme="glass"] body { background: transparent; }
+  [data-theme="glass"] #sky { display: block;
+    background:
+      radial-gradient(1px 1px at 20px 30px, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 140px 80px, rgba(255,255,255,.8) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 90px 160px, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 200px 220px, rgba(255,255,255,.6) 50%, transparent 51%),
+      radial-gradient(1px 1px at 260px 40px, rgba(255,255,255,.7) 50%, transparent 51%),
+      radial-gradient(1px 1px at 50px 250px, rgba(255,255,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 37px 113px, rgba(255,255,255,.55) 50%, transparent 51%),
+      radial-gradient(1px 1px at 173px 147px, rgba(255,255,255,.7) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 231px 271px, rgba(255,255,255,.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 119px 13px, rgba(255,255,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 61px 61px, rgba(255,255,255,.35) 50%, transparent 51%),
+      radial-gradient(1px 1px at 157px 197px, rgba(255,255,255,.4) 50%, transparent 51%),
+      radial-gradient(ellipse 120% 60% at 70% 110%, #1b2433 0%, transparent 60%),
+      radial-gradient(ellipse 80% 50% at 15% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+      linear-gradient(180deg, #05070d 0%, #0a1220 55%, #121a28 100%);
+    background-size: 280px 280px, 280px 280px, 280px 280px, 280px 280px, 280px 280px, 280px 280px, 280px 280px, 280px 280px, 280px 280px, 190px 190px, 190px 190px, 190px 190px, 100% 100%, 100% 100%, 100% 100%;
+  }
+  [data-theme="glass"] #sky::after { content: ""; position: absolute; inset: auto 0 0 0; height: 38vh;
+    background: linear-gradient(170deg, transparent 0 30%, rgba(8,12,20,.9) 30.2%), linear-gradient(195deg, transparent 0 45%, rgba(5,8,14,.95) 45.2%);
+    opacity: .7; }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---------- header ---------- */
+  header { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--bg) 72%, transparent); border-bottom: 1px solid var(--line); }
+  [data-theme="glass"] header { background: rgba(6,10,19,.35); }
+  header .wrap { display: flex; align-items: center; gap: 14px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; letter-spacing: -.02em; white-space: nowrap; }
+  .brand .logo { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+  .brand .slash { color: var(--faint); font-weight: 400; }
+  .brand .dim { color: var(--muted); font-weight: 500; }
+  #headsub { color: var(--muted); font: 11.5px/1.3 var(--mono); letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .spacer { flex: 1; }
+
+  /* ---------- controls ---------- */
+  button, select, input { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); padding: 7px 12px; line-height: 1.2; transition: border-color .15s, background .15s, color .15s; }
+  button:hover { border-color: var(--line-strong); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.ghost { background: transparent; }
+  button.link { background: none; border: none; padding: 4px 2px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  button.link:hover { color: var(--ink); }
+  button.icon { display: inline-flex; align-items: center; gap: 7px; }
+  select, input[type=date], input[type=search] { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 7px 10px; color-scheme: dark; }
+  [data-theme="daylight"] select, [data-theme="daylight"] input { color-scheme: light; }
+  select option { background: var(--surface); color: var(--ink); }
+  [data-theme="glass"] select option { background: #141a26; }
+  input[type=checkbox] { accent-color: var(--accent); }
+
+  /* ---------- panels ---------- */
+  main.wrap { padding-top: 22px; padding-bottom: 80px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px; margin-bottom: 14px;
+    backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: var(--card-shadow); }
+  .eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .eyebrow::after { content: "▸"; font-size: 9px; color: var(--faint); }
+  .eyebrow.plain::after { content: none; }
+
+  /* ---------- loader ---------- */
+  #loader { padding: 0; overflow: hidden; }
+  #drop { padding: 56px 24px 40px; text-align: center; border-radius: var(--r-lg); transition: background .2s, box-shadow .2s; }
+  #drop.over { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  #drop .drop-icon { width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-fg); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+  #drop h2 { margin: 0 0 8px; font-size: 28px; letter-spacing: -.03em; font-weight: 600; }
+  #drop .lead { color: var(--muted); }
+  #drop .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 24px 0 8px; }
+  #drop .btns button { padding: 10px 16px; }
+  #status { color: var(--muted); font: 12px var(--mono); margin-top: 12px; min-height: 1.5em; }
+  .help { border-top: 1px solid var(--line); margin: 28px auto 0; padding-top: 22px; max-width: 620px; text-align: left; color: var(--muted); font-size: 13.5px; }
+  .help b { color: var(--ink-2); font-weight: 600; }
+  .help ol { padding: 0; margin: 12px 0; list-style: none; counter-reset: s; }
+  .help li { counter-increment: s; position: relative; padding-left: 34px; margin-bottom: 10px; }
+  .help li::before { content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: 1px; font: 11px var(--mono); color: var(--accent-fg); }
+
+  /* ---------- stats ---------- */
+  #stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+  .stat { margin: 0; padding: 18px 18px 0; display: flex; flex-direction: column; min-height: 156px; overflow: hidden; position: relative; }
+  .stat .value { font-size: 30px; font-weight: 600; letter-spacing: -.035em; margin-top: 14px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat .value .unit { color: var(--faint); font-weight: 500; }
+  .stat .sub { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .stat .pill { align-self: flex-start; margin-top: 10px; font: 500 11px var(--mono); padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-fg); }
+  .stat svg.spark { display: block; margin: auto -18px 0; width: calc(100% + 36px); height: 54px; }
+
+  /* ---------- timeline chart ---------- */
+  .chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; }
+  .legend .lg-label { font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .legend .dot.alt { background: var(--muted); }
+  .legend .lg-val { font-size: 19px; font-weight: 600; letter-spacing: -.03em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  #timeline { width: 100%; height: 190px; }
+  #timeline svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #timeline .yr { cursor: pointer; }
+  #timeline .yr rect.hit { fill: transparent; }
+  #timeline .yr:hover rect.hit { fill: var(--grid); }
+  #timeline .yr.on rect.hit { fill: var(--accent-soft); }
+  #timeline .yr text { font: 10.5px var(--mono); fill: var(--faint); }
+  #timeline .yr.on text, #timeline .yr:hover text { fill: var(--ink); }
+
+  /* ---------- filters ---------- */
+  .seg { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; overflow-x: auto; scrollbar-width: none; }
+  .seg button { border: 0; background: transparent; color: var(--muted); border-radius: 8px; padding: 7px 13px; white-space: nowrap; font-weight: 500; }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong), 0 1px 2px rgba(0,0,0,.2); }
+  [data-theme="glass"] .seg button.on { background: rgba(255,255,255,.1); }
+  .filters { display: grid; gap: 14px; margin-top: 18px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .label { font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); width: 84px; flex-shrink: 0; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+  .chips button { padding: 5px 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .chips button small { font: 10.5px var(--mono); color: var(--faint); margin-left: 6px; }
+  .chips button.on small { color: inherit; opacity: .6; }
+  .chips button.empty { opacity: .4; }
+  .search { flex: 1; min-width: 200px; position: relative; }
+  .search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+  .search input { width: 100%; padding-left: 34px; }
+  .to { color: var(--faint); font-size: 13px; }
+  .opts { font-size: 12.5px; color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
+  .opts label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  #dataInfo { font: 11px var(--mono); color: var(--faint); }
+
+  /* ---------- gem ---------- */
+  #gem { display: none; border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--surface); }
+  #gem.show { display: block; animation: rise .35s ease; }
+  #gem .gemhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 8px; }
+  #gem .gemhead .eyebrow { color: var(--accent-fg); }
+  #gem .gemhead span { display: flex; gap: 6px; }
+  #gem .card { margin: 0; background: transparent; border: 0; padding: 0; box-shadow: none; backdrop-filter: none; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- results ---------- */
+  #summary { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 26px 2px 14px; }
+  #summary h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
+  #summary .muted { font: 11.5px var(--mono); color: var(--muted); }
+  .card { display: grid; grid-template-columns: 208px 1fr; gap: 18px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: 10px;
+    backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: var(--card-shadow); transition: border-color .15s; }
+  .card:hover { border-color: var(--line-strong); }
+  .card > div { min-width: 0; }
+  .thumb { display: block; aspect-ratio: 16/9; background: var(--surface-2); border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--line); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+  .card:hover .thumb img { transform: scale(1.03); }
+  .meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font: 11.5px var(--mono); color: var(--faint); }
+  .badge { font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .07em; padding: 3px 7px; border-radius: 5px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+  .badge.comment { background: var(--accent-soft); color: var(--accent-fg); border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+  .ago { color: var(--ink-2); }
+  .title { display: block; font-weight: 600; font-size: 15px; letter-spacing: -.015em; margin: 8px 0 0; text-decoration: none; line-height: 1.35; }
+  .title:hover { color: var(--accent-fg); }
+  .title.unknown { color: var(--muted); font-weight: 500; }
+  .channel { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .text { margin: 10px 0 4px; white-space: pre-wrap; word-break: break-word; padding: 10px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink-2); position: relative; }
+  .text::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: var(--accent); }
+  .links { font: 11.5px var(--mono); display: flex; gap: 14px; margin-top: 8px; }
+  .links a { color: var(--muted); text-decoration: none; }
+  .links a:hover { color: var(--accent-fg); }
+  #more { display: block; margin: 20px auto; padding: 10px 18px; }
+  .empty-state { text-align: center; color: var(--muted); padding: 56px 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-lg); }
+  mark { background: var(--accent-soft); color: var(--ink); border-radius: 3px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+  /* ---------- theme picker ---------- */
+  .theme-wrap { position: relative; }
+  #themePanel { position: absolute; right: 0; top: calc(100% + 10px); width: 300px; z-index: 30; padding: 16px; margin: 0;
+    background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+  [data-theme="glass"] #themePanel { background: rgba(18,24,36,.85); }
+  #themePanel .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 18px; }
+  #themePanel .preset { padding: 6px; border-radius: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; text-align: left; background: transparent; }
+  #themePanel .preset.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: inherit; background: transparent; }
+  .preview { height: 52px; border-radius: 6px; position: relative; overflow: hidden; border: 1px solid rgba(128,128,128,.25); }
+  .preview i { position: absolute; left: 6px; right: 6px; height: 12px; border-radius: 3px; }
+  .preview i:nth-child(1) { top: 7px; } .preview i:nth-child(2) { top: 23px; right: 20px; }
+  .preview b { position: absolute; left: 6px; bottom: 7px; width: 16px; height: 5px; border-radius: 2px; background: var(--accent); }
+  .pv-midnight { background: #08090a; } .pv-midnight i { background: #161718; border: 1px solid #23252a; }
+  .pv-glass { background: radial-gradient(1px 1px at 10px 10px, #fff 50%, transparent 51%) 0 0/18px 18px, linear-gradient(180deg, #05070d, #16202f); }
+  .pv-glass i { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); }
+  .pv-daylight { background: #f4f4f2; } .pv-daylight i { background: #fff; border: 1px solid #e5e5e1; }
+  #themePanel .swatches { display: flex; gap: 8px; margin-top: 12px; }
+  #themePanel .sw { width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+  #themePanel .sw.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface) inset; background: var(--c); }
+
+  @media (max-width: 900px) { #stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) {
+    #headsub { display: none; }
+    #themeBtn span { display: none; }
+    .card { grid-template-columns: 1fr; gap: 12px; }
+    .label { width: 100%; }
+    .stat { min-height: 132px; }
+    .stat .value { font-size: 24px; }
+    #drop h2 { font-size: 22px; }
+    #themePanel { position: fixed; left: 16px; right: 16px; top: 68px; width: auto; }
+  }
+</style>
+</head>
+<body>
+<div id="sky"></div>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <span class="logo"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+      <span>Memory Lane</span>
+    </div>
+    <div id="headsub">Find your old comments and the videos you watched years ago</div>
+    <div class="spacer"></div>
+    <button class="link" id="reset" hidden>Load different data</button>
+    <div class="theme-wrap">
+      <button class="icon ghost" id="themeBtn" aria-haspopup="true" aria-expanded="false" title="Theme">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.3" fill="currentColor"/><circle cx="12" cy="7.5" r="1.3" fill="currentColor"/><circle cx="16" cy="10" r="1.3" fill="currentColor"/><path d="M12 21a2.5 2.5 0 0 1 0-5h2a3 3 0 0 0 3-3"/></svg>
+        <span>Theme</span>
+      </button>
+      <div id="themePanel" class="panel" hidden>
+        <div class="eyebrow plain">Preset</div>
+        <div class="presets">
+          <button class="preset" data-theme-pick="midnight"><div class="preview pv-midnight"><i></i><i></i><b></b></div>Midnight</button>
+          <button class="preset" data-theme-pick="glass"><div class="preview pv-glass"><i></i><i></i><b></b></div>Glass</button>
+          <button class="preset" data-theme-pick="daylight"><div class="preview pv-daylight"><i></i><i></i><b></b></div>Daylight</button>
+        </div>
+        <div class="eyebrow plain">Accent</div>
+        <div class="swatches">
+          <button class="sw" data-accent-pick="red" style="--c:#ff4e45" title="Red"></button>
+          <button class="sw" data-accent-pick="lime" style="--c:#e4f222" title="Lime"></button>
+          <button class="sw" data-accent-pick="violet" style="--c:#9b8cff" title="Violet"></button>
+          <button class="sw" data-accent-pick="blue" style="--c:#5b9dff" title="Blue"></button>
+          <button class="sw" data-accent-pick="mint" style="--c:#4ade9b" title="Mint"></button>
+          <button class="sw" data-accent-pick="pink" style="--c:#ff7eb6" title="Pink"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="loader" class="panel">
+    <div id="drop">
+      <div class="drop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+      <h2>Drop your Google Takeout here</h2>
+      <div class="lead">A .zip, an unzipped folder, or single files. Everything stays on your computer.</div>
+      <div class="btns">
+        <button class="primary" id="pickZip">Choose Takeout .zip file(s)</button>
+        <button id="pickFolder">Choose unzipped folder</button>
+      </div>
+      <input type="file" id="zipInput" accept=".zip" multiple hidden>
+      <input type="file" id="folderInput" webkitdirectory multiple hidden>
+      <div id="status"></div>
+      <div class="help">
+        <b>Don't have your export yet?</b>
+        <ol>
+          <li>Go to <a href="https://takeout.google.com" target="_blank" rel="noopener">takeout.google.com</a>, click <i>Deselect all</i>, and tick <b>YouTube and YouTube Music</b>.</li>
+          <li>Under <i>All YouTube data included</i>, keep <b>comments</b>, <b>history</b>, <b>live chats</b> and <b>messages</b>. Untick <b>videos</b>, they're huge.</li>
+          <li>Optionally, under <i>Multiple formats</i>, set history to <b>JSON</b>.</li>
+          <li>Export once as .zip, download it when Google emails you, then drop it here.</li>
+        </ol>
+        If Takeout split your export into several zips, select all of them at once.
+      </div>
+    </div>
+  </section>
+
+  <section id="app" hidden>
+    <div id="stats"></div>
+
+    <div class="panel">
+      <div class="chart-head">
+        <div class="eyebrow">Activity by year</div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div id="timeline"></div>
+    </div>
+
+    <div class="panel">
+      <div class="seg" id="kindChips">
+        <button data-kind="comment">Comments</button>
+        <button data-kind="chat">Live chats</button>
+        <button data-kind="message">Messages</button>
+        <button data-kind="upload">My uploads</button>
+        <button data-kind="watch">Watch history</button>
+        <button data-kind="all">Everything</button>
+      </div>
+      <div class="filters">
+        <div class="row">
+          <div class="label">Go back</div>
+          <div class="chips" id="yearChips"></div>
+        </div>
+        <div class="row">
+          <div class="label">Exact date</div>
+          <input type="date" id="dateInput">
+          <select id="windowSel" title="How wide around the date">
+            <option value="0">that day only</option>
+            <option value="3">± 3 days</option>
+            <option value="7">± 1 week</option>
+            <option value="30">± 1 month</option>
+            <option value="90">± 3 months</option>
+            <option value="year">that whole year</option>
+          </select>
+          <button id="onThisDay" title="This date in every year">On this day, every year</button>
+          <button id="showAll">Everything</button>
+        </div>
+        <div class="row">
+          <div class="label">Range</div>
+          <input type="date" id="fromInput"> <span class="to">to</span> <input type="date" id="toInput">
+          <button id="applyRange">Apply</button>
+        </div>
+        <div class="row">
+          <div class="label">Search</div>
+          <div class="search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="search" id="search" placeholder="Words in your comments, video titles or channels…">
+          </div>
+          <select id="sortSel">
+            <option value="asc">Oldest first</option>
+            <option value="desc">Newest first</option>
+          </select>
+          <button class="primary icon" id="gemBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+            Random old gem
+          </button>
+        </div>
+        <div class="opts">
+          <label><input type="checkbox" id="lookupTitles"> Look up missing video titles online (sends video IDs to YouTube)</label>
+          <span id="dataInfo"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="gem" class="panel">
+      <div class="gemhead"><div class="eyebrow plain">Random gem</div><span><button id="gemAgain">Another one</button><button id="gemClose" class="ghost">Close</button></span></div>
+      <div id="gemBody"></div>
+    </div>
+
+    <div id="summary"><h2 id="sumTitle"></h2><span class="muted" id="sumCount"></span></div>
+    <div id="results"></div>
+    <button id="more" hidden>Show more</button>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const P = window.TakeoutParser;
+  const $ = id => document.getElementById(id);
+  const DAY = 86400000;
+  const PAGE = 60;
+
+  const state = {
+    comments: [], watches: [], titleOf: new Map(),
+    kind: 'comment', mode: 'years', center: null, win: '7', from: null, to: null,
+    q: '', sort: 'asc', shown: PAGE, list: [],
+  };
+
+  // ---------- storage ----------
+  function idb() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('memory-lane', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('data');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function saveData() {
+    try {
+      const db = await idb();
+      db.transaction('data', 'readwrite').objectStore('data').put({ comments: state.comments, watches: state.watches, savedAt: Date.now() }, 'v1');
+    } catch (e) { console.warn('Could not save', e); }
+  }
+  async function loadSaved() {
+    try {
+      const db = await idb();
+      return await new Promise(res => {
+        const r = db.transaction('data').objectStore('data').get('v1');
+        r.onsuccess = () => res(r.result || null);
+        r.onerror = () => res(null);
+      });
+    } catch (e) { return null; }
+  }
+  async function clearSaved() {
+    try { const db = await idb(); db.transaction('data', 'readwrite').objectStore('data').delete('v1'); } catch (e) {}
+  }
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  // ---------- loading ----------
+  const status = msg => { $('status').textContent = msg; };
+
+  async function processEntries(entries) {
+    const comments = [], watches = [];
+    let n = 0, used = 0;
+    for (const e of entries) {
+      if (!P.isCandidate(e.path)) continue;
+      n++;
+      status(`Reading ${e.path.split('/').pop()}…`);
+      try {
+        const r = P.parseFile(e.path, await e.getText());
+        if (r && (r.comments.length || r.watches.length)) {
+          used++;
+          comments.push(...r.comments);
+          watches.push(...r.watches);
+        }
+      } catch (err) { console.warn('Failed', e.path, err); }
+    }
+    if (!comments.length && !watches.length) {
+      status(n ? "Couldn't find any YouTube comments or watch history in those files. Make sure the export included YouTube comments/history."
+               : 'No readable files found in that selection.');
+      return;
+    }
+    setData(
+      P.dedupe(comments, c => c.id || c.t + '|' + c.text),
+      P.dedupe(watches, w => w.t + '|' + w.vid),
+    );
+    saveData();
+    status('');
+  }
+
+  async function fromZips(files) {
+    if (!window.JSZip) { status('The zip reader needs an internet connection. Unzip the file and use "Choose unzipped folder" instead.'); return; }
+    const entries = [];
+    for (const f of files) {
+      status(`Opening ${f.name}…`);
+      try {
+        const zip = await JSZip.loadAsync(f);
+        zip.forEach((path, entry) => { if (!entry.dir) entries.push({ path, getText: () => entry.async('string') }); });
+      } catch (e) { status(`Couldn't open ${f.name}: ${e.message}`); return; }
+    }
+    await processEntries(entries);
+  }
+
+  function fromFiles(files) {
+    const zips = files.filter(f => /\.zip$/i.test(f.name));
+    if (zips.length) return fromZips(zips);
+    return processEntries(files.map(f => ({ path: f.webkitRelativePath || f._path || f.name, getText: () => f.text() })));
+  }
+
+  async function filesFromDrop(dt) {
+    const out = [];
+    const walk = entry => new Promise(res => {
+      if (entry.isFile) entry.file(f => { f._path = entry.fullPath.replace(/^\//, ''); out.push(f); res(); }, () => res());
+      else if (entry.isDirectory) {
+        const reader = entry.createReader(), all = [];
+        const read = () => reader.readEntries(async batch => {
+          if (!batch.length) { for (const c of all) await walk(c); res(); }
+          else { all.push(...batch); read(); }
+        }, () => res());
+        read();
+      } else res();
+    });
+    const roots = [...dt.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (!roots.length) return [...dt.files];
+    for (const r of roots) await walk(r);
+    return out;
+  }
+
+  // ---------- data ----------
+  function setData(comments, watches) {
+    state.comments = comments.sort((a, b) => a.t - b.t);
+    state.watches = watches.sort((a, b) => a.t - b.t);
+    state.titleOf = new Map();
+    for (const w of state.watches) if (w.title && !/^https?:/.test(w.title)) state.titleOf.set(w.vid, { title: w.title, channel: w.channel });
+    for (const c of state.comments) if (c.vid && c.title && !state.titleOf.has(c.vid)) state.titleOf.set(c.vid, { title: c.title, channel: '' });
+    const firstKind = ['comment', 'chat', 'message', 'upload'].find(k => state.comments.some(c => c.k === k));
+    state.kind = firstKind || 'watch';
+    document.querySelectorAll('#kindChips button').forEach(b => {
+      const k = b.dataset.kind;
+      b.hidden = k !== 'all' && (k === 'watch' ? !state.watches.length : !state.comments.some(c => c.k === k));
+    });
+    $('loader').hidden = true;
+    $('app').hidden = false;
+    $('reset').hidden = false;
+    const first = [...state.comments, ...state.watches].reduce((m, x) => Math.min(m, x.t), Infinity);
+    const n = k => state.comments.filter(c => c.k === k).length;
+    const parts = [[n('comment'), 'comments'], [n('chat'), 'live chats'], [n('message'), 'messages'], [n('upload'), 'uploads'], [state.watches.length, 'watched videos']]
+      .filter(([c]) => c).map(([c, label]) => `${c.toLocaleString()} ${label}`);
+    $('headsub').textContent = `${parts.join(' · ')} · since ${fmtDate(first)}`;
+    renderStats(first);
+    const maxYears = yearsAvailable();
+    goYearsAgo(Math.min(10, maxYears || 1));
+  }
+
+  const pool = () => state.kind === 'all' ? state.comments.concat(state.watches) : state.kind === 'watch' ? state.watches : state.comments.filter(c => c.k === state.kind);
+
+  function yearsAvailable() {
+    const first = Math.min(state.comments[0]?.t ?? Infinity, state.watches[0]?.t ?? Infinity);
+    if (first === Infinity) return 0;
+    return new Date().getFullYear() - new Date(first).getFullYear();
+  }
+
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  function yearsAgoDate(n) { const d = startOfDay(new Date()); d.setFullYear(d.getFullYear() - n); return d; }
+
+  function timeFilter() {
+    if (state.mode === 'all') return () => true;
+    if (state.mode === 'range') {
+      const a = state.from ? state.from.getTime() : -Infinity;
+      const b = state.to ? state.to.getTime() + DAY : Infinity;
+      return x => x.t >= a && x.t < b;
+    }
+    const c = state.center;
+    if (state.win === 'year') {
+      if (state.mode === 'onthisday') return () => true;
+      const a = new Date(c.getFullYear(), 0, 1).getTime(), b = new Date(c.getFullYear() + 1, 0, 1).getTime();
+      return x => x.t >= a && x.t < b;
+    }
+    const w = Number(state.win);
+    if (state.mode === 'onthisday') {
+      return x => {
+        const d = new Date(x.t);
+        const anniv = new Date(d.getFullYear(), c.getMonth(), c.getDate()).getTime();
+        const day = startOfDay(d).getTime();
+        return Math.abs(day - anniv) <= w * DAY + 1;
+      };
+    }
+    const a = c.getTime() - w * DAY, b = c.getTime() + (w + 1) * DAY;
+    return x => x.t >= a && x.t < b;
+  }
+
+  function searchFilter() {
+    const q = state.q.trim().toLowerCase();
+    if (!q) return () => true;
+    return x => {
+      const info = state.titleOf.get(x.vid);
+      const hay = [x.text, x.title, x.channel, info && info.title, info && info.channel].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    };
+  }
+
+  // ---------- rendering ----------
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmtDate = t => { const d = new Date(t); return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; };
+  const fmtTime = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const toInputDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const fromInputDate = v => { if (!v) return null; const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d); };
+
+  function ago(t) {
+    const now = new Date(), d = new Date(t);
+    let months = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth();
+    if (now.getDate() < d.getDate()) months--;
+    const y = Math.floor(months / 12), m = months % 12;
+    if (y >= 1) return m ? `${y} yr${y > 1 ? 's' : ''}, ${m} mo ago` : `${y} year${y > 1 ? 's' : ''} ago`;
+    if (months >= 1) return `${months} month${months > 1 ? 's' : ''} ago`;
+    const days = Math.floor((now - d) / DAY);
+    return days <= 0 ? 'today' : `${days} day${days > 1 ? 's' : ''} ago`;
+  }
+
+  function highlight(text) {
+    const safe = esc(text);
+    const q = state.q.trim();
+    if (!q) return safe;
+    const re = new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    return safe.replace(re, m => `<mark>${m}</mark>`);
+  }
+
+  function cardHTML(x) {
+    const info = state.titleOf.get(x.vid) || lookupCache[x.vid];
+    const videoUrl = x.vid ? `https://www.youtube.com/watch?v=${x.vid}` : x.post ? `https://www.youtube.com/post/${x.post}` : '';
+    let titleHTML;
+    if (info && info.title) titleHTML = `<a class="title" href="${videoUrl}" target="_blank" rel="noopener">${highlight(info.title)}</a>`;
+    else if (info && info.missing) titleHTML = `<a class="title unknown" href="${videoUrl}" target="_blank" rel="noopener">Video unavailable (deleted or private)</a>`;
+    else if (x.vid) titleHTML = `<a class="title unknown" data-vid="${x.vid}" href="${videoUrl}" target="_blank" rel="noopener">${state.lookup ? 'Loading title…' : 'Untitled video (open to see)'}</a>`;
+    else if (x.post) titleHTML = `<a class="title unknown" href="${videoUrl}" target="_blank" rel="noopener">Community post</a>`;
+    else titleHTML = `<span class="title unknown">Unknown video</span>`;
+
+    const thumb = x.vid
+      ? `<a class="thumb" href="${videoUrl}" target="_blank" rel="noopener"><img loading="lazy" alt="" src="https://i.ytimg.com/vi/${x.vid}/mqdefault.jpg"></a>`
+      : `<div class="thumb"></div>`;
+    const badge = x.k === 'watch' ? `<span class="badge">${x.music ? 'Listened' : 'Watched'}</span>`
+      : x.k === 'chat' ? `<span class="badge comment">Live chat</span>`
+      : x.k === 'message' ? `<span class="badge comment">${x.text ? 'Message' : 'Shared a video'}</span>`
+      : x.k === 'upload' ? `<span class="badge comment">Uploaded</span>`
+      : `<span class="badge comment">${x.reply ? 'Reply' : 'Comment'}</span>`;
+    const channel = info && info.channel ? `<div class="channel">${highlight(info.channel)}</div>` : '';
+    const text = x.k !== 'watch' && x.text ? `<p class="text">${highlight(x.text)}</p>` : '';
+    const links = x.k === 'comment' && x.vid && x.id
+      ? `<div class="links"><a href="${videoUrl}&lc=${encodeURIComponent(x.id)}" target="_blank" rel="noopener">Open my comment on YouTube</a></div>` : '';
+    return `<article class="card">${thumb}<div>
+      <div class="meta">${badge}<span>${fmtDate(x.t)} · ${fmtTime(x.t)}</span><span class="ago">${ago(x.t)}</span></div>
+      ${titleHTML}${channel}${text}${links}</div></article>`;
+  }
+
+  function describe() {
+    const what = { comment: 'Comments', chat: 'Live chats', message: 'Messages', upload: 'Uploads', watch: 'Watched', all: 'Everything' }[state.kind];
+    if (state.mode === 'all') return `${what}: everything`;
+    if (state.mode === 'range') return `${what} from ${state.from ? fmtDate(state.from) : 'the start'} to ${state.to ? fmtDate(state.to) : 'now'}`;
+    const winTxt = { '0': '', '3': ' (± 3 days)', '7': ' (± 1 week)', '30': ' (± 1 month)', '90': ' (± 3 months)' }[state.win] || '';
+    if (state.mode === 'onthisday') return `${what} on ${MONTHS[state.center.getMonth()]} ${state.center.getDate()}, every year${winTxt}`;
+    if (state.win === 'year') return `${what} in ${state.center.getFullYear()}`;
+    return `${what} around ${fmtDate(state.center)}${winTxt}`;
+  }
+
+  function render() {
+    const tf = timeFilter(), sf = searchFilter();
+    let list = pool().filter(x => tf(x) && sf(x));
+    list.sort((a, b) => state.sort === 'asc' ? a.t - b.t : b.t - a.t);
+    state.list = list;
+    $('sumTitle').textContent = describe();
+    $('sumCount').textContent = `${list.length.toLocaleString()} result${list.length === 1 ? '' : 's'}`;
+    const shown = list.slice(0, state.shown);
+    $('results').innerHTML = shown.length ? shown.map(cardHTML).join('')
+      : `<div class="empty-state">Nothing here. Try a wider window (± 1 month or the whole year), or pick a year from the bars above.</div>`;
+    $('more').hidden = list.length <= state.shown;
+    $('more').textContent = `Show more (${(list.length - state.shown).toLocaleString()} left)`;
+    renderControls();
+    observeTitles();
+  }
+
+  function renderControls() {
+    document.querySelectorAll('#kindChips button').forEach(b => b.classList.toggle('on', b.dataset.kind === state.kind));
+    $('windowSel').value = state.win;
+    $('sortSel').value = state.sort;
+    if (state.center) $('dateInput').value = toInputDate(state.center);
+    $('onThisDay').classList.toggle('on', state.mode === 'onthisday');
+    $('showAll').classList.toggle('on', state.mode === 'all');
+
+    const max = yearsAvailable();
+    const items = pool();
+    const w = state.win === 'year' ? null : Number(state.win);
+    let html = '';
+    for (let n = 1; n <= Math.max(max, 1); n++) {
+      const c = yearsAgoDate(n);
+      let a, b;
+      if (w === null) { a = new Date(c.getFullYear(), 0, 1).getTime(); b = new Date(c.getFullYear() + 1, 0, 1).getTime(); }
+      else { a = c.getTime() - w * DAY; b = c.getTime() + (w + 1) * DAY; }
+      const count = countBetween(items, a, b);
+      const on = state.mode === 'years' && state.yearsAgo === n;
+      html += `<button data-years="${n}" class="${on ? 'on' : ''} ${count ? '' : 'empty'}">${n} yr${n > 1 ? 's' : ''}<small>${count}</small></button>`;
+    }
+    $('yearChips').innerHTML = html;
+
+    renderChart(items);
+  }
+
+  // Activity per year as an area chart; year columns are clickable.
+  function renderChart(items) {
+    const counts = new Map();
+    for (const x of items) { const y = new Date(x.t).getFullYear(); counts.set(y, (counts.get(y) || 0) + 1); }
+    const ys = [...counts.keys()].sort();
+    if (!ys.length) { $('timeline').innerHTML = ''; $('legend').innerHTML = ''; return; }
+    const years = [];
+    for (let y = ys[0]; y <= ys[ys.length - 1]; y++) years.push(y);
+    const vals = years.map(y => counts.get(y) || 0);
+    const top = Math.max(...vals);
+    const W = $('timeline').clientWidth || 800, H = $('timeline').clientHeight || 190;
+    const padL = 6, padR = 6, padT = 14, base = H - 26;
+    const step = years.length > 1 ? (W - padL - padR) / (years.length - 1) : 0;
+    const X = i => years.length > 1 ? padL + i * step : W / 2;
+    const Y = v => base - (top ? v / top : 0) * (base - padT);
+    const pts = vals.map((v, i) => [X(i), Y(v)]);
+    let line = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, Math.min(base, p1[1] + (p2[1] - p0[1]) / 6)];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, Math.min(base, p2[1] - (p3[1] - p1[1]) / 6)];
+      line += ` C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${p2[0]},${p2[1]}`;
+    }
+    const area = `${line} L${pts[pts.length - 1][0]},${base} L${pts[0][0]},${base} Z`;
+    const activeYear = state.mode === 'onthisday' || state.mode === 'all' || state.mode === 'range' || !state.center ? null : state.center.getFullYear();
+    const gridY = f => base - f * (base - padT);
+    const grid = [0.25, 0.5, 0.75].map(f => `<line x1="0" x2="${W}" y1="${gridY(f)}" y2="${gridY(f)}" stroke="var(--grid)" stroke-dasharray="3 5"/>`).join('');
+    const colW = years.length > 1 ? step : W;
+    const labelEvery = Math.ceil(years.length / Math.max(1, Math.floor(W / 44)));
+    const cols = years.map((y, i) => {
+      const on = y === activeYear;
+      const label = i % labelEvery === 0 || on ? `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">'${String(y).slice(2)}</text>` : '';
+      const dot = on ? `<circle cx="${X(i)}" cy="${Y(vals[i])}" r="5" fill="var(--bg)" stroke="var(--accent)" stroke-width="2.5"/>` : '';
+      return `<g class="yr ${on ? 'on' : ''}" data-year="${y}"><title>${y}: ${vals[i].toLocaleString()}</title>
+        <rect class="hit" x="${Math.max(0, X(i) - colW / 2)}" y="0" width="${Math.min(W, X(i) + colW / 2) - Math.max(0, X(i) - colW / 2)}" height="${base}" rx="6"/>${label}${dot}</g>`;
+    }).join('');
+    $('timeline').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Activity per year">
+      <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--accent)" stop-opacity=".38"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+      ${grid}<line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="var(--line-strong)"/>
+      <path d="${area}" fill="url(#ag)"/>
+      <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${cols}</svg>`;
+    const iMax = vals.indexOf(top);
+    const nonzero = vals.map((v, i) => [v, i]).filter(([v]) => v);
+    const [vMin, iMin] = nonzero.reduce((m, p) => p[0] < m[0] ? p : m, nonzero[0]);
+    const lg = (cls, label, y, v) => `<div><div class="lg-label"><span class="dot ${cls}"></span>${label}</div><div class="lg-val">${y} <span style="color:var(--faint)">· ${v.toLocaleString()}</span></div></div>`;
+    $('legend').innerHTML = lg('', 'Busiest year', years[iMax], top) + (years.length > 1 ? lg('alt', 'Quietest year', years[iMin], vMin) : '');
+  }
+
+  // ---------- stat cards ----------
+  function yearCounts(list, years) {
+    const m = new Map();
+    for (const x of list) { const y = new Date(x.t).getFullYear(); m.set(y, (m.get(y) || 0) + 1); }
+    return years.map(y => m.get(y) || 0);
+  }
+  let sparkId = 0;
+  function spark(vals, color) {
+    const W = 300, H = 54, top = Math.max(1, ...vals);
+    const pts = vals.map((v, i) => [vals.length > 1 ? i / (vals.length - 1) * W : W / 2, H - 4 - v / top * (H - 12)]);
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    const id = 'sp' + (++sparkId);
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".3"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${line} L${W},${H} L0,${H} Z" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  function renderStats(first) {
+    const all = state.comments.concat(state.watches);
+    const y0 = new Date(first).getFullYear(), y1 = new Date().getFullYear();
+    const years = [];
+    for (let y = y0; y <= y1; y++) years.push(y);
+    const wrote = state.comments.filter(c => c.k !== 'upload');
+    const perYear = yearCounts(all, years);
+    const iBusy = perYear.indexOf(Math.max(...perYear));
+    const yrs = y1 - y0;
+    const card = (label, value, sub, extra = '') => `<div class="panel stat"><div class="eyebrow">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}${extra}</div>`;
+    $('stats').innerHTML = [
+      card('First memory', y0, fmtDate(first), `<div class="pill">${yrs ? `${yrs} year${yrs > 1 ? 's' : ''} ago` : 'this year'}</div>`),
+      card('Things you wrote', wrote.length.toLocaleString(), 'comments, chats &amp; messages', spark(yearCounts(wrote, years), 'var(--accent)')),
+      card('Videos watched', state.watches.length.toLocaleString(), state.watches.length ? `since ${new Date(state.watches[0].t).getFullYear()}` : 'no watch history loaded', spark(yearCounts(state.watches, years), 'var(--muted)')),
+      card('Busiest year', years[iBusy], `${perYear[iBusy].toLocaleString()} things <span style="color:var(--faint)">· all types</span>`, spark(perYear, 'var(--accent)')),
+    ].join('');
+  }
+
+  // Sources are sorted by time, so counts use binary search.
+  function countBetween(items, a, b) {
+    if (state.kind === 'all') return countSorted(state.comments, a, b) + countSorted(state.watches, a, b);
+    return countSorted(items, a, b);
+  }
+  function countSorted(arr, a, b) { return lowerBound(arr, b) - lowerBound(arr, a); }
+  function lowerBound(arr, t) { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m].t < t) lo = m + 1; else hi = m; } return lo; }
+
+  // ---------- actions ----------
+  function goYearsAgo(n) {
+    state.mode = 'years'; state.yearsAgo = n; state.center = yearsAgoDate(n); state.shown = PAGE;
+    render();
+  }
+
+  function randomGem() {
+    let list = state.list.length ? state.list : pool();
+    // Prefer items older than 2 years with real text
+    const old = Date.now() - 2 * 365 * DAY;
+    const better = list.filter(x => x.t < old && (x.k === 'watch' || x.k === 'upload' || (x.text || '').length > 3));
+    if (better.length) list = better;
+    if (!list.length) return;
+    const x = list[Math.floor(Math.random() * list.length)];
+    $('gemBody').innerHTML = cardHTML(x);
+    $('gem').classList.add('show');
+    $('gem').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    observeTitles();
+  }
+
+  // ---------- online title lookup (optional) ----------
+  const lookupCache = ls.get('ml-titles', {});
+  const inFlight = new Set();
+  let queue = [], active = 0;
+  state.lookup = ls.get('ml-lookup', true);
+  $('lookupTitles').checked = state.lookup;
+
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); enqueue(e.target.dataset.vid); }
+  }, { rootMargin: '300px' }) : null;
+
+  function observeTitles() {
+    if (!state.lookup || !io) return;
+    document.querySelectorAll('.title[data-vid]').forEach(el => io.observe(el));
+  }
+  function enqueue(vid) {
+    if (!vid || lookupCache[vid] || inFlight.has(vid)) return;
+    inFlight.add(vid); queue.push(vid); pump();
+  }
+  function pump() {
+    while (active < 4 && queue.length) {
+      const vid = queue.shift(); active++;
+      fetchTitle(vid).then(info => {
+        if (info) { lookupCache[vid] = info; ls.set('ml-titles', lookupCache); applyTitle(vid, info); }
+      }).finally(() => { active--; inFlight.delete(vid); pump(); });
+    }
+  }
+  async function fetchTitle(vid) {
+    const url = `https://www.youtube.com/watch?v=${vid}`;
+    try {
+      const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`);
+      if (r.ok) { const j = await r.json(); return { title: j.title, channel: j.author_name }; }
+      if (r.status === 401 || r.status === 403 || r.status === 404) return { missing: true };
+    } catch (e) { /* blocked by CORS or offline, try fallback */ }
+    try {
+      const r = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
+      const j = await r.json();
+      if (j.title) return { title: j.title, channel: j.author_name };
+      if (j.error) return { missing: true };
+    } catch (e) {}
+    return null;
+  }
+  function applyTitle(vid, info) {
+    document.querySelectorAll(`.title[data-vid="${vid}"]`).forEach(el => {
+      el.removeAttribute('data-vid');
+      if (info.missing) { el.textContent = 'Video unavailable (deleted or private)'; return; }
+      el.textContent = info.title;
+      el.classList.remove('unknown');
+      if (info.channel) el.insertAdjacentHTML('afterend', `<div class="channel">${esc(info.channel)}</div>`);
+    });
+  }
+
+  // ---------- wiring ----------
+  $('pickZip').onclick = () => $('zipInput').click();
+  $('pickFolder').onclick = () => $('folderInput').click();
+  $('zipInput').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) fromZips(f); };
+  $('folderInput').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) fromFiles(f); };
+  const drop = $('drop');
+  document.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  document.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
+  document.addEventListener('drop', async e => {
+    e.preventDefault(); drop.classList.remove('over'); status('Reading…');
+    const plain = [...e.dataTransfer.files];
+    let files = await filesFromDrop(e.dataTransfer);
+    if (!files.length) files = plain;
+    if (!files.length) { status('Nothing came through. If you dragged out of a zip, extract it first (right-click → Extract All), then drag the folder.'); return; }
+    $('loader').hidden = false;
+    fromFiles(files);
+  });
+
+  $('reset').onclick = async () => {
+    if (!confirm('Forget the loaded data and load a different export?')) return;
+    await clearSaved();
+    location.reload();
+  };
+
+  $('kindChips').onclick = e => { const b = e.target.closest('button'); if (!b) return; state.kind = b.dataset.kind; state.shown = PAGE; render(); };
+  $('yearChips').onclick = e => { const b = e.target.closest('button'); if (b) goYearsAgo(Number(b.dataset.years)); };
+  $('timeline').onclick = e => {
+    const y = e.target.closest('.yr'); if (!y) return;
+    state.mode = 'date'; state.win = 'year'; state.center = new Date(Number(y.dataset.year), 0, 1); state.shown = PAGE; render();
+  };
+  $('dateInput').onchange = e => {
+    const d = fromInputDate(e.target.value); if (!d) return;
+    state.mode = state.mode === 'onthisday' ? 'onthisday' : 'date'; state.center = d; state.shown = PAGE; render();
+  };
+  $('windowSel').onchange = e => { state.win = e.target.value; if (state.mode === 'all' || state.mode === 'range') state.mode = 'date'; state.shown = PAGE; render(); };
+  $('onThisDay').onclick = () => {
+    if (state.mode === 'onthisday') { state.mode = 'date'; }
+    else { state.mode = 'onthisday'; if (!state.center) state.center = startOfDay(new Date()); if (state.win === 'year') state.win = '0'; }
+    state.shown = PAGE; render();
+  };
+  $('showAll').onclick = () => { state.mode = 'all'; state.shown = PAGE; render(); };
+  $('applyRange').onclick = () => {
+    state.from = fromInputDate($('fromInput').value); state.to = fromInputDate($('toInput').value);
+    if (!state.from && !state.to) return;
+    state.mode = 'range'; state.shown = PAGE; render();
+  };
+  let searchTimer;
+  $('search').oninput = e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.q = e.target.value; state.shown = PAGE; render(); }, 200); };
+  $('sortSel').onchange = e => { state.sort = e.target.value; state.shown = PAGE; render(); };
+  $('more').onclick = () => { state.shown += PAGE; render(); };
+  $('gemBtn').onclick = randomGem;
+  $('gemAgain').onclick = randomGem;
+  $('gemClose').onclick = () => $('gem').classList.remove('show');
+  $('lookupTitles').onchange = e => { state.lookup = e.target.checked; ls.set('ml-lookup', state.lookup); render(); };
+
+  // ---------- theme picker ----------
+  const root = document.documentElement;
+  function syncTheme() {
+    const t = root.dataset.theme || 'midnight', a = root.dataset.accent || 'red';
+    document.querySelectorAll('[data-theme-pick]').forEach(b => b.classList.toggle('on', b.dataset.themePick === t));
+    document.querySelectorAll('[data-accent-pick]').forEach(b => b.classList.toggle('on', b.dataset.accentPick === a));
+  }
+  const closeTheme = () => { $('themePanel').hidden = true; $('themeBtn').setAttribute('aria-expanded', 'false'); };
+  $('themeBtn').onclick = e => {
+    e.stopPropagation();
+    const open = $('themePanel').hidden;
+    $('themePanel').hidden = !open;
+    $('themeBtn').setAttribute('aria-expanded', String(open));
+  };
+  $('themePanel').onclick = e => {
+    e.stopPropagation();
+    const t = e.target.closest('[data-theme-pick]'), a = e.target.closest('[data-accent-pick]');
+    if (t) { root.dataset.theme = t.dataset.themePick; ls.set('ml-theme', t.dataset.themePick); }
+    if (a) { root.dataset.accent = a.dataset.accentPick; ls.set('ml-accent', a.dataset.accentPick); }
+    syncTheme();
+  };
+  document.addEventListener('click', closeTheme);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTheme(); });
+  syncTheme();
+
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (!$('app').hidden) renderChart(pool()); }, 120); });
+
+  // When served by server.js, load every export file from my-data on startup
+  async function autoLoad() {
+    if (location.protocol !== 'http:') return false;
+    try {
+      const list = await (await fetch('/api/files')).json();
+      if (!list.length) return false;
+      await processEntries(list.map(p => ({ path: p, getText: () => fetch('/' + p.split('/').map(encodeURIComponent).join('/')).then(r => r.text()) })));
+      if (!state.comments.length && !state.watches.length) return false;
+      $('dataInfo').textContent = `Loaded automatically from ${list.length} file${list.length > 1 ? 's' : ''} in the app folder`;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  autoLoad().then(ok => ok ? null : loadSaved()).then(saved => {
+    if (saved && (saved.comments.length || saved.watches.length)) {
+      setData(saved.comments, saved.watches);
+      $('dataInfo').textContent = `Loaded from last time (${fmtDate(saved.savedAt)})`;
+    }
+  });
+})();
+</script>
+</body>
+</html>

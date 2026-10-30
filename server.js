@@ -1,7 +1,5 @@
-// Tiny local server: serves the app and lists every Takeout file in this folder,
-// so the page can load your comments/history automatically on open.
-// Put your unzipped Takeout files anywhere inside the my-data folder.
-// Run with start.bat (or `node server.js`), then it opens http://localhost:5178
+// Local server: serves the app and lists the export files in my-data/ for auto-loading.
+// Usage: node server.js (or start.bat), then open http://localhost:5178
 const http = require('http');
 const fs = require('fs');
 const path = require('path');

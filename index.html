@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YouTube Memory Lane</title>
 <script>
-  // Apply saved theme before paint so there's no flash
+  // Apply saved theme before first paint
   try {
     const t = JSON.parse(localStorage.getItem('ml-theme') || 'null'), a = JSON.parse(localStorage.getItem('ml-accent') || 'null');
     if (t) document.documentElement.dataset.theme = t;
@@ -55,7 +55,7 @@
   [hidden] { display: none !important; }
   ::selection { background: var(--accent); color: var(--accent-ink); }
 
-  /* Glass: starry night sky behind everything */
+  /* Glass background */
   #sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; display: none; }
   [data-theme="glass"] body { background: transparent; }
   [data-theme="glass"] #sky { display: block;
@@ -292,7 +292,6 @@
 </header>
 
 <main class="wrap">
-  <!-- Load screen -->
   <section id="loader" class="panel">
     <div id="drop">
       <div class="drop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
@@ -318,7 +317,6 @@
     </div>
   </section>
 
-  <!-- App -->
   <section id="app" hidden>
     <div id="stats"></div>
 
@@ -410,7 +408,7 @@
     q: '', sort: 'asc', shown: PAGE, list: [],
   };
 
-  // ---------- storage (IndexedDB, so you don't need to reload the zip every time) ----------
+  // ---------- storage ----------
   function idb() {
     return new Promise((res, rej) => {
       const r = indexedDB.open('memory-lane', 1);
@@ -447,7 +445,6 @@
   const status = msg => { $('status').textContent = msg; };
 
   async function processEntries(entries) {
-    // entries: [{ path, getText }]
     const comments = [], watches = [];
     let n = 0, used = 0;
     for (const e of entries) {
@@ -495,7 +492,6 @@
     return processEntries(files.map(f => ({ path: f.webkitRelativePath || f._path || f.name, getText: () => f.text() })));
   }
 
-  // Walk dropped folders
   async function filesFromDrop(dt) {
     const out = [];
     const walk = entry => new Promise(res => {
@@ -537,7 +533,6 @@
       .filter(([c]) => c).map(([c, label]) => `${c.toLocaleString()} ${label}`);
     $('headsub').textContent = `${parts.join(' · ')} · since ${fmtDate(first)}`;
     renderStats(first);
-    // Start on "10 years ago" if there's anything there, else the oldest year available.
     const maxYears = yearsAvailable();
     goYearsAgo(Math.min(10, maxYears || 1));
   }
@@ -553,7 +548,6 @@
   const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   function yearsAgoDate(n) { const d = startOfDay(new Date()); d.setFullYear(d.getFullYear() - n); return d; }
 
-  // Returns a predicate for the current time filter
   function timeFilter() {
     if (state.mode === 'all') return () => true;
     if (state.mode === 'range') {
@@ -678,7 +672,6 @@
     $('onThisDay').classList.toggle('on', state.mode === 'onthisday');
     $('showAll').classList.toggle('on', state.mode === 'all');
 
-    // "N years ago" chips with counts for the current window
     const max = yearsAvailable();
     const items = pool();
     const w = state.win === 'year' ? null : Number(state.win);
@@ -697,7 +690,7 @@
     renderChart(items);
   }
 
-  // Smooth area chart of activity per year; each year column is clickable.
+  // Activity per year as an area chart; year columns are clickable.
   function renderChart(items) {
     const counts = new Map();
     for (const x of items) { const y = new Date(x.t).getFullYear(); counts.set(y, (counts.get(y) || 0) + 1); }
@@ -781,7 +774,7 @@
     ].join('');
   }
 
-  // items are sorted by time within each source, so binary search per source.
+  // Sources are sorted by time, so counts use binary search.
   function countBetween(items, a, b) {
     if (state.kind === 'all') return countSorted(state.comments, a, b) + countSorted(state.watches, a, b);
     return countSorted(items, a, b);
@@ -797,7 +790,7 @@
 
   function randomGem() {
     let list = state.list.length ? state.list : pool();
-    // Prefer comments with actual text, and older stuff (2+ years)
+    // Prefer items older than 2 years with real text
     const old = Date.now() - 2 * 365 * DAY;
     const better = list.filter(x => x.t < old && (x.k === 'watch' || x.k === 'upload' || (x.text || '').length > 3));
     if (better.length) list = better;
@@ -866,7 +859,6 @@
   $('pickFolder').onclick = () => $('folderInput').click();
   $('zipInput').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) fromZips(f); };
   $('folderInput').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) fromFiles(f); };
-  // Drop anywhere on the page, not just the box
   const drop = $('drop');
   document.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
   document.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
@@ -945,7 +937,7 @@
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (!$('app').hidden) renderChart(pool()); }, 120); });
 
-  // When opened via start.bat, read every export file sitting in this folder automatically
+  // When served by server.js, load every export file from my-data on startup
   async function autoLoad() {
     if (location.protocol !== 'http:') return false;
     try {
@@ -958,7 +950,6 @@
     } catch (e) { return false; }
   }
 
-  // Restore previous session
   autoLoad().then(ok => ok ? null : loadSaved()).then(saved => {
     if (saved && (saved.comments.length || saved.watches.length)) {
       setData(saved.comments, saved.watches);

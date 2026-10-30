@@ -1,5 +1,4 @@
-// Parsers for Google Takeout YouTube exports (comments + watch history).
-// Pure string parsing, no DOM, so it can be tested in Node as well as used in the page.
+// Parsers for Google Takeout YouTube exports. No DOM access, so it also runs in Node.
 (function (root) {
   'use strict';
 
@@ -46,7 +45,7 @@
     return t;
   }
 
-  // Takeout stores comment text as JSON fragments: {"text":"hi "},{"text":"@someone","mention":...}
+  // Comment text is stored as JSON fragments: {"text":"hi "},{"text":"@name","mention":...}
   function parseCommentText(raw) {
     raw = (raw || '').trim();
     if (!raw.startsWith('{')) return raw;
@@ -71,7 +70,7 @@
     const isMessage = col(/^message id/) >= 0;
     let iText = col(/comment text|live chat text|message text/);
     if (iText < 0) iText = col(/^text$/);
-    // Some message exports only have shared videos and no text column
+    // Message exports may have no text column (shared videos only)
     if (iTime < 0 || (iText < 0 && !isMessage)) return null;
     const iId = col(/comment id|chat id|message id|^id$/), iVid = col(/video id/), iParent = col(/parent/), iPost = col(/post id/);
     const kind = isMessage ? 'message' : col(/live chat/) >= 0 || /live.?chat/i.test(path) ? 'chat' : 'comment';
@@ -94,7 +93,7 @@
     return out;
   }
 
-  // "video texts.csv": titles/descriptions of videos you uploaded, split across numbered segment columns.
+  // "video texts.csv": upload titles and descriptions, split across numbered segment columns.
   function parseVideoTextsCSV(rows, head) {
     const iVid = head.findIndex(h => /^video id/.test(h));
     const iTime = head.findIndex(h => /create timestamp/.test(h));
@@ -112,7 +111,7 @@
     return out;
   }
 
-  // Older Takeouts: my-comments.html, one <li> per comment.
+  // Older exports: my-comments.html, one <li> per comment.
   function parseCommentsHTML(text) {
     const out = [];
     const items = text.split(/<li[\s>]/i).slice(1);
@@ -183,14 +182,13 @@
     return out;
   }
 
-  // Is this a file inside the export worth reading?
   function isCandidate(path) {
     const p = path.toLowerCase();
     if (p.endsWith('.csv') || p.endsWith('.json')) return true;
     return p.endsWith('.html') && /comment|watch|history|verlauf|historial|historique/.test(p);
   }
 
-  // Returns { comments: [], watches: [] } for one file, or null if it isn't recognised.
+  // Returns { comments, watches } for a file, or null if it isn't recognised.
   function parseFile(path, text) {
     const p = path.toLowerCase();
     if (p.endsWith('.csv')) {

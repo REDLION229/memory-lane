@@ -21,8 +21,15 @@ function listData(dir, out = []) {
   return out;
 }
 
-http.createServer((req, res) => {
+// Exit once no open page has checked in for a while, so nothing lingers after the tab is closed.
+const IDLE_LIMIT = 90000;
+let lastPing = Date.now();
+setInterval(() => { if (Date.now() - lastPing > IDLE_LIMIT) process.exit(0); }, 10000).unref();
+
+const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
+  lastPing = Date.now();
+  if (url === '/api/ping') { res.writeHead(204); return res.end(); }
   if (url === '/api/files') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(fs.existsSync(DATA) ? listData(DATA) : []));
@@ -34,8 +41,17 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream' });
     res.end(buf);
   });
-}).listen(PORT, '127.0.0.1', () => {
-  const link = `http://localhost:${PORT}`;
-  console.log(`Memory Lane running at ${link}  (close this window to stop)`);
-  exec(`start "" "${link}"`);
+});
+
+const link = `http://localhost:${PORT}`;
+const openBrowser = () => exec(process.platform === 'win32' ? `start "" "${link}"` : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} "${link}"`);
+
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') { openBrowser(); process.exit(0); }
+  console.error(`Could not start: ${err.message}`);
+  process.exit(1);
+});
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Memory Lane running at ${link}. It stops on its own shortly after you close the page.`);
+  openBrowser();
 });

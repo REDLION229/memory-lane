@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YouTube Memory Lane</title>
+<meta name="description" content="Look back at your old YouTube comments, live chats, messages and watch history. Runs in your browser; your data never leaves your computer.">
+<meta property="og:title" content="YouTube Memory Lane">
+<meta property="og:description" content="See what you watched and said on YouTube, years ago. Private: your data never leaves your computer.">
+<meta name="theme-color" content="#08090a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23ff4e45'/%3E%3Cpath d='M12 9.5v13l10.5-6.5z' fill='%23fff'/%3E%3C/svg%3E">
 <script>
   // Apply saved theme before first paint
   try {
@@ -432,7 +437,7 @@
         </li>
       </ol>
       <div class="faqs">
-        <details><summary>Is this safe?</summary><p>Yes. The app runs entirely in your browser and your files never leave this computer. The only optional online feature looks up the names of videos your export doesn't include, which sends just the video's ID to YouTube. You can switch it off after importing.</p></details>
+        <details><summary>Is this safe?</summary><p>Yes. The app runs entirely in your browser and your files never leave this computer. To show thumbnails and video titles, it asks YouTube for them using each video's ID, the same way any web page shows a YouTube thumbnail. Your comments and history are never sent anywhere. You can switch this off after importing.</p></details>
         <details><summary>My download is huge (many gigabytes)</summary><p>That's your uploaded videos. You can still import it: the app skips videos and only reads the small files it needs. For a much smaller download next time, untick <b>videos</b> in step 1.</p></details>
         <details><summary>Google split it into several .zip files</summary><p>Download all of them and select them together when importing. You can also add more later with <b>Add files</b> at the top of the page.</p></details>
         <details><summary>Where is my data kept after importing?</summary><p>In this browser, so it opens instantly next time. Click <b>Start over</b> at the top of the page to erase it. Your original files are never changed.</p></details>
@@ -513,7 +518,7 @@
           </button>
         </div>
         <div class="opts">
-          <label><input type="checkbox" id="lookupTitles"> Look up missing video titles online (sends video IDs to YouTube)</label>
+          <label><input type="checkbox" id="lookupTitles"> Load thumbnails and video titles from YouTube (sends only video IDs)</label>
           <span id="dataInfo"></span>
         </div>
       </div>
@@ -557,8 +562,14 @@
   async function saveData() {
     try {
       const db = await idb();
-      db.transaction('data', 'readwrite').objectStore('data').put({ comments: state.comments, watches: state.watches, savedAt: Date.now() }, 'v1');
-    } catch (e) { console.warn('Could not save', e); }
+      await new Promise((res, rej) => {
+        const tx = db.transaction('data', 'readwrite');
+        tx.objectStore('data').put({ comments: state.comments, watches: state.watches, savedAt: Date.now() }, 'v1');
+        tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error);
+      });
+    } catch (e) {
+      $('dataInfo').textContent = "This browser didn't allow saving (private window?), so you'll need to import again next time.";
+    }
   }
   async function loadSaved() {
     try {
@@ -815,7 +826,7 @@
     else if (x.post) titleHTML = `<a class="title unknown" href="${videoUrl}" target="_blank" rel="noopener">Community post</a>`;
     else titleHTML = `<span class="title unknown">Unknown video</span>`;
 
-    const thumb = x.vid
+    const thumb = x.vid && state.lookup
       ? `<a class="thumb" href="${videoUrl}" target="_blank" rel="noopener"><img loading="lazy" alt="" onload="this.classList.add('ok')" onerror="this.classList.add('ok')" src="https://i.ytimg.com/vi/${x.vid}/mqdefault.jpg"></a>`
       : `<div class="thumb"></div>`;
     const badge = x.k === 'watch' ? `<span class="badge">${x.music ? 'Listened' : 'Watched'}</span>`
@@ -1037,12 +1048,6 @@
       const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`);
       if (r.ok) { const j = await r.json(); return { title: j.title, channel: j.author_name }; }
       if (r.status === 401 || r.status === 403 || r.status === 404) return { missing: true };
-    } catch (e) { /* blocked by CORS or offline, try fallback */ }
-    try {
-      const r = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
-      const j = await r.json();
-      if (j.title) return { title: j.title, channel: j.author_name };
-      if (j.error) return { missing: true };
     } catch (e) {}
     return null;
   }
@@ -1162,6 +1167,8 @@
       return true;
     } catch (e) { return false; }
   }
+
+  if (location.protocol === 'http:') setInterval(() => fetch('/api/ping').catch(() => {}), 20000);
 
   autoLoad().then(ok => ok ? null : loadSaved()).then(saved => {
     if (saved && (saved.comments.length || saved.watches.length)) {
